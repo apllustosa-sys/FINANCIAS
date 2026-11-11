@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Orçamento Doméstico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: livro-caixa de uma coluna — resumo do mês no topo, receitas e despesas como planilhas, visão anual no fim */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --fg:#17201d; --muted:#5d6b66; --line:#dde3e0; --soft:#eaefec;
+  --accent:#1f5f55; --accent-fg:#ffffff;
+  --in:#1e7a4c; --in-soft:#e1f2e8; --out:#b4452f; --out-soft:#f8e6e1; --warn:#a86b00;
+  --f-display:"Sora",system-ui,sans-serif; --f-body:"Inter",system-ui,sans-serif; --f-num:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#111816; --surface:#18211e; --fg:#e4ebe8; --muted:#94a39d; --line:#2a3632; --soft:#1f2a26;
+  --accent:#5fb8a6; --accent-fg:#0d1513;
+  --in:#5cc78f; --in-soft:#173326; --out:#ec8a73; --out-soft:#3a201a; --warn:#e0a640; color-scheme:dark}}
+
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+[hidden]{display:none!important}
+.wrap{max-width:980px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
+h1,h2{font-family:var(--f-display);margin:0;text-wrap:balance}
+h1{font-size:1.7rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.1rem;font-weight:600}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+
+header.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+.month-nav{display:flex;align-items:center;gap:6px}
+.month-nav .cur{min-width:170px;text-align:center;font-family:var(--f-display);font-weight:600;font-size:1.05rem}
+button,.btn{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:7px 12px}
+button:hover,.btn:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,.btn:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600}
+button.icon{width:36px;height:36px;padding:0;display:grid;place-items:center;font-size:1.1rem}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+button.ghost:hover{color:var(--out);border-color:transparent}
+.btn input{position:absolute;width:1px;height:1px;opacity:0}
+.status{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--in)} .dot.busy{background:var(--warn)} .dot.local{background:var(--out)}
+
+.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:2px}
+.tile .v{font-family:var(--f-num);font-size:1.45rem;font-weight:500;font-variant-numeric:tabular-nums}
+.tile.in .v{color:var(--in)} .tile.out .v{color:var(--out)}
+.tile.bal{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.tile.bal .label{color:inherit;opacity:.8}
+.tile .sub{font-size:.8rem;color:var(--muted)} .tile.bal .sub{color:inherit;opacity:.8}
+
+section.sheet{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sheet-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.sheet-head .tot{font-family:var(--f-num);font-weight:500}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;background:var(--soft)}
+th.r,td.r{text-align:right}
+td{border-top:1px solid var(--line);padding:4px 6px;vertical-align:middle}
+td input,td select{width:100%;font:inherit;border:1px solid transparent;background:transparent;color:var(--fg);padding:6px 6px;border-radius:6px}
+td input:hover,td select:hover{border-color:var(--line)}
+td input:focus,td select:focus{border-color:var(--accent);background:var(--bg);outline:none}
+td input.val{text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+td.chk{text-align:center;width:64px}
+td.chk input{width:18px;height:18px;accent-color:var(--in);cursor:pointer}
+tr.paid td input.desc{color:var(--muted)}
+td.del{width:40px}
+.sheet-foot{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+
+.cats{display:grid;gap:8px;padding:14px 16px}
+.cat-row{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr) 7.5rem;gap:10px;align-items:center;font-size:.88rem}
+.bar{height:10px;border-radius:5px;background:var(--soft);overflow:hidden}
+.bar span{display:block;height:100%;background:var(--out);border-radius:5px}
+
+.year{padding:16px;display:grid;gap:10px}
+.year-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;align-items:end;height:140px}
+.ym{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;cursor:pointer;border-radius:6px;padding-top:4px}
+.ym:hover{background:var(--soft)}
+.ym.sel{background:var(--soft);outline:1px solid var(--accent)}
+.ym .bars{flex:1;display:flex;align-items:flex-end;gap:2px;width:100%;justify-content:center}
+.ym .bars i{display:block;width:38%;max-width:12px;border-radius:3px 3px 0 0;min-height:2px}
+.ym .bars i.a{background:var(--in)} .ym .bars i.b{background:var(--out)}
+.ym small{font-size:.68rem;color:var(--muted);text-transform:uppercase}
+.legend{display:flex;gap:16px;font-size:.8rem;color:var(--muted);flex-wrap:wrap}
+.legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:.85rem}
+.notice{font-size:.85rem;background:var(--out-soft);color:var(--out);padding:10px 14px;border-radius:10px}
+.hint{font-size:.8rem;color:var(--muted);margin:0}
+
+@media (max-width:640px){
+  .summary{grid-template-columns:1fr}
+  .cat-row{grid-template-columns:minmax(0,7rem) minmax(0,1fr) 6.5rem}
+  .month-nav .cur{min-width:140px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div style="display:grid;gap:4px">
+      <span class="label">Planilha de receitas e despesas</span>
+      <h1>Orçamento Doméstico</h1>
+      <div class="status"><span class="dot" id="dot"></span><span id="statusText">Carregando…</span></div>
+    </div>
+    <div class="month-nav">
+      <button class="icon" id="prev" aria-label="Mês anterior">‹</button>
+      <div class="cur" id="curMonth"></div>
+      <button class="icon" id="next" aria-label="Próximo mês">›</button>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <div class="summary">
+    <div class="tile in"><span class="label">Receitas</span><span class="v" id="tIn">R$ 0,00</span><span class="sub" id="tInSub"></span></div>
+    <div class="tile out"><span class="label">Despesas</span><span class="v" id="tOut">R$ 0,00</span><span class="sub" id="tOutSub"></span></div>
+    <div class="tile bal"><span class="label">Saldo do mês</span><span class="v" id="tBal">R$ 0,00</span><span class="sub" id="tBalSub"></span></div>
+  </div>
+
+  <section class="sheet" aria-labelledby="hIn">
+    <div class="sheet-head"><h2 id="hIn">Receitas</h2><span class="tot" id="totIn" style="color:var(--in)"></span></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Descrição</th><th style="width:160px">Data</th><th class="r" style="width:170px">Valor (R$)</th><th></th></tr></thead>
+      <tbody id="bodyIn"></tbody>
+    </table></div>
+    <div class="sheet-foot"><button id="addIn">+ Adicionar receita</button></div>
+  </section>
+
+  <section class="sheet" aria-labelledby="hOut">
+    <div class="sheet-head"><h2 id="hOut">Despesas</h2><span class="tot" id="totOut" style="color:var(--out)"></span></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Descrição</th><th style="width:170px">Categoria</th><th style="width:140px">Vencimento</th><th class="r" style="width:150px">Valor (R$)</th><th style="text-align:center">Pago</th><th></th></tr></thead>
+      <tbody id="bodyOut"></tbody>
+    </table></div>
+    <div class="sheet-foot"><button id="addOut">+ Adicionar despesa</button></div>
+  </section>
+
+  <section class="sheet" aria-labelledby="hCat">
+    <div class="sheet-head"><h2 id="hCat">Despesas por categoria</h2></div>
+    <div class="cats" id="cats"></div>
+  </section>
+
+  <section class="sheet" aria-labelledby="hYear">
+    <div class="sheet-head"><h2 id="hYear">Visão do ano <span id="yearLbl"></span></h2><span class="tot" id="yearBal"></span></div>
+    <div class="year">
+      <div class="year-grid" id="yearGrid"></div>
+      <div class="legend"><span><b style="background:var(--in)"></b>Receitas</span><span><b style="background:var(--out)"></b>Despesas</span><span>Clique num mês para abrir.</span></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <button id="copyPrev">Copiar itens do mês anterior</button>
+    <button id="exportCsv">Baixar planilha do mês (CSV)</button>
+    <button id="clearMonth" class="ghost">Limpar este mês</button>
+  </div>
+
+  <section class="sheet" aria-labelledby="hBk">
+    <div class="sheet-head"><h2 id="hBk">Backup dos dados</h2></div>
+    <div style="padding:14px 16px;display:grid;gap:10px">
+      <p class="hint">Os dados ficam guardados só neste navegador. Salve um backup de vez em quando e use-o para levar tudo para outro aparelho.</p>
+      <div class="toolbar">
+        <button id="exportJson">Salvar backup</button>
+        <label class="btn" for="importJson">Restaurar backup<input type="file" id="importJson" accept=".json,application/json"></label>
+      </div>
+    </div>
+  </section>
+
+  <div class="notice" id="confirmBox" hidden>
+    <span id="confirmText"></span>
+    <div class="toolbar" style="margin-top:8px"><button class="primary" id="confirmYes">Confirmar</button><button id="confirmNo">Cancelar</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+const CATS=["Prestações","Água","Luz","Condomínio","Internet/Telefone","Gás","Alimentação","Transporte","Saúde","Educação","Lazer","Outros"];
+const MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const brl=v=>(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const fmt=v=>(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const parse=s=>{if(typeof s==="number")return s;s=String(s||"").replace(/[^\d,.-]/g,"");if(s.includes(","))s=s.replace(/\./g,"").replace(",",".");const n=parseFloat(s);return isFinite(n)?Math.round(n*100)/100:0};
+const uid=()=>Math.random().toString(36).slice(2,10);
+const $=id=>document.getElementById(id);
+
+const now=new Date();
+let current=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+const months={};
+let saveTimer=null;
+
+function template(){
+  return {
+    receitas:[{id:uid(),desc:"Salário",data:"",valor:0}],
+    despesas:[
+      {id:uid(),desc:"Prestação",cat:"Prestações",venc:"",valor:0,pago:false},
+      {id:uid(),desc:"Conta de água",cat:"Água",venc:"",valor:0,pago:false},
+      {id:uid(),desc:"Conta de luz",cat:"Luz",venc:"",valor:0,pago:false},
+      {id:uid(),desc:"Condomínio",cat:"Condomínio",venc:"",valor:0,pago:false}
+    ]
+  };
+}
+function month(id){ if(!months[id]) months[id]=Object.assign(template(),{_tpl:true}); return months[id]; }
+function shift(id,d){const [y,m]=id.split("-").map(Number);const t=new Date(y,m-1+d,1);return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")}
+function label(id){const [y,m]=id.split("-").map(Number);return MESES[m-1]+" de "+y}
+const sum=arr=>arr.reduce((a,r)=>a+(+r.valor||0),0);
+
+function setStatus(kind,text){$("dot").className="dot "+kind;$("statusText").textContent=text}
+function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2200)}
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+function renderTables(){
+  const m=month(current);
+  $("curMonth").textContent=label(current);
+  $("bodyIn").innerHTML=m.receitas.map(r=>`<tr data-id="${r.id}">
+    <td><input class="desc" id="in-d-${r.id}" data-f="desc" value="${esc(r.desc)}" placeholder="Ex.: Salário, aluguel recebido" aria-label="Descrição"></td>
+    <td><input type="date" id="in-t-${r.id}" data-f="data" value="${esc(r.data)}" aria-label="Data"></td>
+    <td><input class="val" id="in-v-${r.id}" data-f="valor" inputmode="decimal" value="${fmt(r.valor)}" aria-label="Valor"></td>
+    <td class="del"><button class="ghost icon" data-del="in" aria-label="Remover receita">×</button></td></tr>`).join("")
+    || `<tr><td colspan="4" class="muted" style="padding:14px">Nenhuma receita neste mês.</td></tr>`;
+  $("bodyOut").innerHTML=m.despesas.map(r=>`<tr data-id="${r.id}" class="${r.pago?"paid":""}">
+    <td><input class="desc" id="out-d-${r.id}" data-f="desc" value="${esc(r.desc)}" placeholder="Ex.: Financiamento do carro" aria-label="Descrição"></td>
+    <td><select id="out-c-${r.id}" data-f="cat" aria-label="Categoria">${CATS.map(c=>`<option${c===r.cat?" selected":""}>${c}</option>`).join("")}</select></td>
+    <td><input type="date" id="out-t-${r.id}" data-f="venc" value="${esc(r.venc)}" aria-label="Vencimento"></td>
+    <td><input class="val" id="out-v-${r.id}" data-f="valor" inputmode="decimal" value="${fmt(r.valor)}" aria-label="Valor"></td>
+    <td class="chk"><input type="checkbox" id="out-p-${r.id}" data-f="pago"${r.pago?" checked":""} aria-label="Pago"></td>
+    <td class="del"><button class="ghost icon" data-del="out" aria-label="Remover despesa">×</button></td></tr>`).join("")
+    || `<tr><td colspan="6" class="muted" style="padding:14px">Nenhuma despesa neste mês.</td></tr>`;
+  renderTotals();
+}
+function renderTotals(){
+  const m=month(current), ti=sum(m.receitas), to=sum(m.despesas), bal=ti-to;
+  const pend=m.despesas.filter(r=>!r.pago&&r.valor>0), pendV=sum(pend);
+  $("tIn").textContent=brl(ti); $("tOut").textContent=brl(to); $("tBal").textContent=brl(bal);
+  $("tInSub").textContent=m.receitas.length+(m.receitas.length===1?" lançamento":" lançamentos");
+  $("tOutSub").textContent=pend.length?`${brl(pendV)} ainda a pagar (${pend.length})`:(to>0?"Tudo pago":"Sem valores lançados");
+  $("tBalSub").textContent=ti>0?`${Math.round(to/ti*100)}% da receita comprometida`:"Lance suas receitas";
+  $("totIn").textContent=brl(ti); $("totOut").textContent=brl(to);
+  const by={}; m.despesas.forEach(r=>{by[r.cat]=(by[r.cat]||0)+(+r.valor||0)});
+  const rows=Object.entries(by).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]); const max=rows.length?rows[0][1]:1;
+  $("cats").innerHTML=rows.length?rows.map(([c,v])=>`<div class="cat-row"><span>${esc(c)}</span><div class="bar"><span style="width:${Math.max(2,v/max*100)}%"></span></div><span class="num" style="text-align:right">${brl(v)}</span></div>`).join("")
+    :`<span class="muted">Preencha os valores das despesas para ver a divisão por categoria.</span>`;
+  renderYear();
+}
+function renderYear(){
+  const y=current.slice(0,4); $("yearLbl").textContent=y;
+  const data=[];for(let i=1;i<=12;i++){const id=y+"-"+String(i).padStart(2,"0");const m=months[id];data.push({id,i:m?sum(m.receitas):0,o:m?sum(m.despesas):0})}
+  const max=Math.max(1,...data.map(d=>Math.max(d.i,d.o)));
+  const tot=data.reduce((a,d)=>a+d.i-d.o,0);
+  $("yearBal").textContent="Saldo no ano: "+brl(tot); $("yearBal").style.color=tot<0?"var(--out)":"var(--in)";
+  $("yearGrid").innerHTML=data.map((d,k)=>`<div class="ym${d.id===current?" sel":""}" data-m="${d.id}" title="${MESES[k]}: receitas ${brl(d.i)}, despesas ${brl(d.o)}">
+    <div class="bars"><i class="a" style="height:${d.i/max*100}%"></i><i class="b" style="height:${d.o/max*100}%"></i></div><small>${MESES[k].slice(0,3)}</small></div>`).join("");
+}
+
+/* edições */
+function markDirty(){ delete month(current)._tpl; scheduleSave(); }
+function onField(e){
+  const el=e.target, f=el.dataset.f; if(!f)return;
+  const tr=el.closest("tr"), list=el.closest("tbody").id==="bodyIn"?"receitas":"despesas";
+  const row=month(current)[list].find(r=>r.id===tr.dataset.id); if(!row)return;
+  if(f==="valor") row.valor=parse(el.value);
+  else if(f==="pago"){ row.pago=el.checked; tr.classList.toggle("paid",el.checked); }
+  else row[f]=el.value;
+  markDirty(); renderTotals();
+}
+["bodyIn","bodyOut"].forEach(id=>{
+  const b=$(id);
+  b.addEventListener("input",onField);
+  b.addEventListener("change",onField);
+  b.addEventListener("focusout",e=>{ if(e.target.dataset.f==="valor") e.target.value=fmt(parse(e.target.value)); });
+  b.addEventListener("focusin",e=>{ if(e.target.dataset.f==="valor"&&parse(e.target.value)===0) e.target.select(); });
+  b.addEventListener("click",e=>{
+    const d=e.target.closest("[data-del]"); if(!d)return;
+    const list=d.dataset.del==="in"?"receitas":"despesas", id=d.closest("tr").dataset.id;
+    const m=month(current); m[list]=m[list].filter(r=>r.id!==id); markDirty(); renderTables();
+  });
+});
+$("addIn").onclick=()=>{const r={id:uid(),desc:"",data:"",valor:0};month(current).receitas.push(r);markDirty();renderTables();$("in-d-"+r.id).focus()};
+$("addOut").onclick=()=>{const r={id:uid(),desc:"",cat:"Outros",venc:"",valor:0,pago:false};month(current).despesas.push(r);markDirty();renderTables();$("out-d-"+r.id).focus()};
+function go(id){ save(); current=id; hideConfirm(); renderTables(); }
+$("prev").onclick=()=>go(shift(current,-1));
+$("next").onclick=()=>go(shift(current,1));
+$("yearGrid").onclick=e=>{const c=e.target.closest("[data-m]"); if(c) go(c.dataset.m)};
+
+let pending=null;
+function ask(text,fn){ $("confirmText").textContent=text; pending=fn; $("confirmBox").hidden=false; $("confirmYes").focus(); }
+function hideConfirm(){ $("confirmBox").hidden=true; pending=null; }
+$("confirmYes").onclick=()=>{const f=pending;hideConfirm();f&&f()};
+$("confirmNo").onclick=hideConfirm;
+
+function shiftDate(d){ if(!d)return ""; const [y,mo,da]=d.split("-").map(Number); const t=new Date(y,mo,Math.min(da,28)); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
+function copyFromPrev(){
+  const p=months[shift(current,-1)], m=month(current);
+  m.receitas=p.receitas.map(r=>({...r,id:uid(),data:shiftDate(r.data)}));
+  m.despesas=p.despesas.map(r=>({...r,id:uid(),pago:false,venc:shiftDate(r.venc)}));
+  markDirty(); renderTables(); toast("Itens copiados de "+label(shift(current,-1)));
+}
+$("copyPrev").onclick=()=>{
+  const p=months[shift(current,-1)];
+  if(!p||p._tpl){ toast("O mês anterior ainda não tem lançamentos"); return; }
+  const m=month(current);
+  if(!m._tpl && (sum(m.receitas)+sum(m.despesas))>0) ask(`Substituir os itens de ${label(current)} pelos de ${label(shift(current,-1))}? Os pagamentos ficam marcados como pendentes.`,copyFromPrev);
+  else copyFromPrev();
+};
+$("clearMonth").onclick=()=>ask(`Apagar todos os lançamentos de ${label(current)} e voltar ao modelo inicial?`,()=>{
+  const t=template(); months[current].receitas=t.receitas; months[current].despesas=t.despesas; markDirty(); renderTables(); toast("Mês limpo");
+});
+
+/* arquivos */
+function download(name,content,type){
+  const blob=new Blob([content],{type}); const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+}
+$("exportCsv").onclick=()=>{
+  const m=month(current), L=[], q=s=>'"'+String(s??"").replace(/"/g,'""')+'"';
+  L.push(["Tipo","Descrição","Categoria","Data/Vencimento","Valor","Pago"].join(";"));
+  m.receitas.forEach(r=>L.push(["Receita",q(r.desc),"",r.data,fmt(r.valor),""].join(";")));
+  m.despesas.forEach(r=>L.push(["Despesa",q(r.desc),q(r.cat),r.venc,fmt(r.valor),r.pago?"Sim":"Não"].join(";")));
+  L.push(""); L.push(["Total receitas","","","",fmt(sum(m.receitas)),""].join(";"));
+  L.push(["Total despesas","","","",fmt(sum(m.despesas)),""].join(";"));
+  L.push(["Saldo","","","",fmt(sum(m.receitas)-sum(m.despesas)),""].join(";"));
+  download(`orcamento-${current}.csv`,"﻿"+L.join("\r\n"),"text/csv;charset=utf-8");
+  toast("Planilha baixada");
+};
+$("exportJson").onclick=()=>{
+  download(`backup-orcamento-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify({app:"orcamento-domestico",versao:1,meses:clean()},null,2),"application/json");
+  toast("Backup salvo");
+};
+$("importJson").onchange=e=>{
+  const f=e.target.files[0]; e.target.value=""; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const o=JSON.parse(rd.result), mm=o&&o.meses;
+      if(!mm||typeof mm!=="object") throw 0;
+      ask(`Restaurar o backup "${f.name}"? Os meses que estão nele substituem os deste navegador.`,()=>{
+        for(const k in mm){ if(/^\d{4}-\d{2}$/.test(k)&&mm[k]) months[k]={receitas:mm[k].receitas||[],despesas:mm[k].despesas||[]}; }
+        save(); renderTables(); toast("Backup restaurado");
+      });
+    }catch(_){ toast("Esse arquivo não é um backup do Orçamento Doméstico"); }
+  };
+  rd.readAsText(f);
+};
+
+/* armazenamento local */
+const LS="orcamento-domestico-v1";
+function clean(){ const o={}; for(const k in months) if(!months[k]._tpl) o[k]={receitas:months[k].receitas,despesas:months[k].despesas}; return o; }
+function scheduleSave(){ clearTimeout(saveTimer); setStatus("busy","Salvando…"); saveTimer=setTimeout(save,500); }
+function save(){
+  clearTimeout(saveTimer);
+  try{ localStorage.setItem(LS,JSON.stringify(clean())); setStatus("ok","Salvo neste navegador"); }
+  catch(e){ setStatus("local","Não foi possível salvar neste navegador"); }
+}
+try{ Object.assign(months,JSON.parse(localStorage.getItem(LS)||"{}")); setStatus("ok","Salvo neste navegador"); }
+catch(e){ setStatus("local","Este navegador não permite salvar"); $("notice").textContent="O navegador está bloqueando o armazenamento (modo anônimo?). Use Salvar backup para não perder os dados."; $("notice").hidden=false; }
+window.addEventListener("pagehide",save);
+renderTables();
+})();
+</script>
+</body>
+</html>
